@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Canlı TV">
+<meta name="theme-color" content="#0e1a22">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>CANLI TV TR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.8/hls.min.js"></script>
+<style>
+:root{--bg:#0e1a22;--panel:#14252f;--line:#233a47;--ink:#e8eef1;--mute:#8aa2ae;--live:#ff4b3e;--sel:#1d3a49;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "Segoe UI",system-ui,sans-serif;display:grid;grid-template-columns:340px 1fr;grid-template-rows:100%;overflow:hidden}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.brand{padding:16px 16px 8px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.02em}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px #ff4b3e33}
+.tools{padding:0 16px 12px}
+input[type=search]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+input:focus-visible,button:focus-visible,.ch:focus-visible{outline:2px solid #6cc4e8;outline-offset:2px}
+.cats{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
+.cats button{white-space:nowrap;background:none;border:1px solid var(--line);color:var(--mute);padding:4px 11px;border-radius:99px;cursor:pointer;font:inherit;font-size:13px}
+.cats button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#list{flex:1;overflow-y:auto;padding:0 8px 8px;scrollbar-width:thin}
+.ch{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;cursor:pointer;border:0;background:none;color:inherit;width:100%;text-align:left;font:inherit}
+.ch:hover{background:#ffffff0d}
+.ch.on{background:var(--sel)}
+.ico{width:34px;height:34px;border-radius:8px;background:#fff;flex:none;display:grid;place-items:center;overflow:hidden;color:#234;font-weight:700;font-size:13px}
+.ico img{width:22px;height:22px}
+.ch small{color:var(--mute);display:block;font-size:12px}
+.ch .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch .txt{min-width:0}
+.nostream{opacity:.45}
+.foot{padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--mute);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.foot button{background:none;border:1px solid var(--line);color:var(--ink);padding:4px 10px;border-radius:6px;cursor:pointer;font:inherit;font-size:12px}
+main{display:flex;flex-direction:column;min-width:0;min-height:0;padding:18px;gap:12px}
+.screen{position:relative;flex:1;min-height:0;background:#000;border-radius:14px;border:1px solid var(--line);overflow:hidden;display:grid;place-items:center}
+video{width:100%;height:100%;background:#000}
+#msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--mute);pointer-events:none;word-break:break-all}
+#msg b{display:block;color:var(--ink);font-size:20px;margin-bottom:6px}
+#msg.hide{display:none}
+.bar{display:flex;align-items:center;gap:12px;min-height:44px}
+.bar h1{margin:0;font-size:20px}
+.bar .live{background:var(--live);color:#fff;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px}
+.bar span.cat{color:var(--mute)}
+.bar .sp{flex:1}
+.bar button{background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.bar button:hover{background:var(--sel)}
+.only{display:block;margin-top:8px;font-size:13px;color:var(--mute)}
+.hint{color:var(--mute);font-size:12px}
+@media(max-width:760px){body{grid-template-columns:1fr;grid-template-rows:55% 45%;}main{order:-1;padding:10px}aside{border-right:0;border-top:1px solid var(--line)}.hint{display:none}}
+@media(prefers-reduced-motion:no-preference){.ch{transition:background .12s}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><span class="dot"></span>CANLI TV TR</div>
+  <div class="tools">
+    <input id="q" type="search" placeholder="Kanal ara" aria-label="Kanal ara">
+    <div class="cats" id="cats"></div>
+    <label class="only"><input type="checkbox" id="only" checked> Sadece çalışan kanallar</label>
+  </div>
+  <div id="list" role="listbox" aria-label="Kanallar"></div>
+  <div class="foot">
+    <span id="status">Katalog yükleniyor…</span>
+    <span><button id="imp" title="channels.json ve stream_map.json dosyalarını seçin">Dosya aç</button>
+    <button id="tst">Sına</button> <button id="upd">Güncelle</button></span>
+  </div>
+  <input id="file" type="file" accept=".json" multiple hidden>
+</aside>
+<main>
+  <div class="screen">
+    <video id="v" controls autoplay playsinline webkit-playsinline></video>
+    <div id="msg"><div><b>Bir kanal seçin</b>Soldaki listeden izlemek istediğiniz kanala tıklayın.</div></div>
+  </div>
+  <div class="bar">
+    <span class="live" id="liveTag" hidden>CANLI</span>
+    <h1 id="title">CANLI TV TR</h1>
+    <span class="cat" id="ctitle"></span>
+    <span class="sp"></span>
+    <span class="hint">↑ ↓ kanal değiştir · F tam ekran · M sessiz</span>
+    <button id="fs">Tam ekran</button>
+  </div>
+</main>
+
+<script>
+const BUNDLED = {"channels":[{"id":"360-tv","name":"360 TV","category":"Ulusal","website":"https://tv360.com.tr"},{"id":"4u-tv","name":"4U TV","category":"Yerel","website":""},{"id":"a-haber","name":"A Haber","category":"Haber","website":"https://ahaber.com.tr"},{"id":"a-spor","name":"A Spor","category":"Spor","website":"https://aspor.com.tr"},{"id":"a2tv","name":"A2TV","category":"Ulusal","website":""},{"id":"afroturk-tv","name":"Afroturk TV","category":"Yerel","website":""},{"id":"aksu-tv","name":"Aksu TV","category":"Yerel","website":""},{"id":"al-zahra-tv-turkic","name":"Al-Zahra TV Turkic","category":"Dini","website":""},{"id":"alanya-posta-tv","name":"Alanya Posta TV","category":"Yerel","website":""},{"id":"almahriah-tv","name":"Almahriah TV","category":"Yerel","website":""},{"id":"altas-tv","name":"Altas TV","category":"Yerel","website":""},{"id":"anadolu-net-tv","name":"Anadolu Net TV","category":"Yerel","website":""},{"id":"atv","name":"ATV","category":"Ulusal","website":"https://atv.com.tr"},{"id":"atv-alanya","name":"ATV Alanya","category":"Ulusal","website":"https://atv.com.tr"},{"id":"atv-avrupa","name":"ATV Avrupa","category":"Ulusal","website":"https://atv.com.tr"},{"id":"benguturk-tv","name":"BENGÜTÜRK TV","category":"Yerel","website":""},{"id":"beyaz-tv","name":"Beyaz TV","category":"Ulusal","website":"https://beyaztv.com.tr"},{"id":"bir-tv","name":"Bir TV","category":"Yerel","website":""},{"id":"bloomberg-ht","name":"Bloomberg HT","category":"Haber","website":"https://bloomberght.com"},{"id":"bloomberght","name":"BloombergHT","category":"Haber","website":""},{"id":"bursa-as-tv","name":"Bursa AS TV","category":"Yerel","website":""},{"id":"bursa-tv","name":"Bursa TV","category":"Yerel","website":""},{"id":"cay-tv","name":"Cay TV","category":"Yerel","website":""},{"id":"cekmekoy-tv","name":"Cekmeköy TV","category":"Yerel","website":""},{"id":"cnbc-e","name":"CNBC-e","category":"Haber","website":"https://cnbce.com"},{"id":"deniz-postasi-tv","name":"Deniz Postası TV","category":"Yerel","website":""},{"id":"dha","name":"DHA","category":"Haber","website":""},{"id":"diyanet-tv","name":"Diyanet TV","category":"Dini","website":"https://diyanet.tv"},{"id":"diyar-tv","name":"Diyar TV","category":"Yerel","website":""},{"id":"dost-tv","name":"Dost TV","category":"Yerel","website":""},{"id":"dream-turk","name":"Dream Türk","category":"Müzik","website":"https://dreamturk.com.tr"},{"id":"edessa-tv","name":"Edessa TV","category":"Yerel","website":""},{"id":"ekoturk","name":"Ekoturk","category":"Haber","website":""},{"id":"erzurum-web-tv","name":"Erzurum Web TV","category":"Yerel","website":""},{"id":"es-tv","name":"ES TV","category":"Yerel","website":""},{"id":"etv-kayseri","name":"ETV Kayseri","category":"Yerel","website":""},{"id":"etv-manisa","name":"ETV Manisa","category":"Yerel","website":""},{"id":"euro-d","name":"Euro D","category":"Ulusal","website":""},{"id":"finans-turk-tv","name":"Finans Turk TV","category":"Haber","website":""},{"id":"flash-haber-tv","name":"Flash Haber TV","category":"Haber","website":"https://flashhaber.com.tr"},{"id":"fortuna-tv","name":"Fortuna TV","category":"Yerel","website":""},{"id":"guneydogu-tv","name":"Guneydogu TV","category":"Yerel","website":""},{"id":"gzt","name":"GZT","category":"Ulusal","website":"https://gzt.com"},{"id":"haber-global","name":"Haber Global","category":"Haber","website":"https://haberglobal.com.tr"},{"id":"haber61-tv","name":"Haber61 TV","category":"Haber","website":""},{"id":"haberturk-tv","name":"Habertürk TV","category":"Haber","website":"https://haberturk.com"},{"id":"halk-tv","name":"Halk TV","category":"Haber","website":"https://halktv.com.tr"},{"id":"htspor-tv","name":"HTSpor TV","category":"Spor","website":""},{"id":"hunat-tv","name":"Hunat TV","category":"Yerel","website":""},{"id":"icel-tv","name":"Icel TV","category":"Yerel","website":""},{"id":"ilke-tv","name":"Ilke TV","category":"Yerel","website":"https://ilketv.com.tr"},{"id":"kanal-12","name":"Kanal 12","category":"Yerel","website":""},{"id":"kanal-15","name":"Kanal 15","category":"Yerel","website":""},{"id":"kanal-23","name":"Kanal 23","category":"Yerel","website":""},{"id":"kanal-26","name":"Kanal 26","category":"Yerel","website":""},{"id":"kanal-3","name":"Kanal 3","category":"Ulusal","website":""},{"id":"kanal-32","name":"Kanal 32","category":"Ulusal","website":""},{"id":"kanal-33","name":"Kanal 33","category":"Ulusal","website":""},{"id":"kanal-34","name":"Kanal 34","category":"Ulusal","website":""},{"id":"kanal-58","name":"KANAL 58","category":"Yerel","website":""},{"id":"kanal-7","name":"Kanal 7","category":"Ulusal","website":"https://kanal7.com"},{"id":"kanal-7-avrupa","name":"Kanal 7 Avrupa","category":"Ulusal","website":"https://kanal7.com"},{"id":"kanal-d","name":"Kanal D","category":"Ulusal","website":"https://kanald.com.tr"},{"id":"kanal-d-drama","name":"Kanal D Drama","category":"Ulusal","website":"https://kanald.com.tr"},{"id":"kanal-firat","name":"Kanal Firat","category":"Yerel","website":""},{"id":"kanal-hayat","name":"Kanal Hayat","category":"Dini","website":""},{"id":"kanal-v","name":"Kanal V","category":"Yerel","website":""},{"id":"kent-turk-tv","name":"Kent Türk TV","category":"Yerel","website":""},{"id":"kocaeli-tv","name":"Kocaeli TV","category":"Yerel","website":""},{"id":"konya-olay-tv","name":"Konya Olay TV","category":"Yerel","website":""},{"id":"kral-pop-tv","name":"KRAL Pop TV","category":"Müzik","website":"https://kralpoptv.com.tr"},{"id":"lalegul-tv","name":"Lalegul TV","category":"Dini","website":"https://lalegultv.com.tr"},{"id":"life-tv","name":"Life TV","category":"Haber","website":""},{"id":"line-tv","name":"Line TV","category":"Haber","website":""},{"id":"luys-tv","name":"Luys TV","category":"Yerel","website":""},{"id":"mavikaradeniz","name":"MaviKaradeniz","category":"Yerel","website":""},{"id":"mekameleen-tv","name":"Mekameleen TV","category":"Dini","website":""},{"id":"meltem-tv","name":"Meltem TV","category":"Yerel","website":"https://meltemtv.com.tr"},{"id":"mercan-tv","name":"Mercan TV","category":"Yerel","website":""},{"id":"minika-cocuk","name":"Minika Cocuk","category":"Çocuk","website":"https://minika.com.tr"},{"id":"minika-go","name":"Minika Go","category":"Çocuk","website":"https://minika.com.tr"},{"id":"mturk-tv","name":"MTürk TV","category":"Müzik","website":""},{"id":"natural-tv","name":"Natural TV","category":"Yerel","website":""},{"id":"now-tv","name":"NOW TV","category":"Ulusal","website":"https://nowtv.com.tr"},{"id":"ntv","name":"NTV","category":"Haber","website":"https://ntv.com.tr"},{"id":"number-1-ask","name":"Number 1 Ask","category":"Müzik","website":""},{"id":"number-1-damar","name":"Number 1 Damar","category":"Müzik","website":""},{"id":"number-1-dance","name":"Number 1 Dance","category":"Müzik","website":""},{"id":"number-1-tv","name":"Number 1 TV","category":"Müzik","website":"https://number1.com.tr"},{"id":"on4-tv","name":"On4 TV","category":"Yerel","website":""},{"id":"power-dance","name":"Power Dance","category":"Müzik","website":""},{"id":"power-love","name":"Power Love","category":"Müzik","website":""},{"id":"power-turk","name":"Power Turk","category":"Müzik","website":""},{"id":"power-tv","name":"Power TV","category":"Müzik","website":""},{"id":"power-turk-akustik","name":"Power Türk Akustik","category":"Müzik","website":""},{"id":"power-turk-slow","name":"Power Türk Slow","category":"Müzik","website":""},{"id":"power-turk-taptaze","name":"Power Türk Taptaze","category":"Müzik","website":""},{"id":"powerturk-tv","name":"PowerTurk TV","category":"Müzik","website":""},{"id":"powerturk-tv","name":"PowerTürk TV","category":"Müzik","website":""},{"id":"qaf-tv","name":"Qaf TV","category":"Yerel","website":""},{"id":"s-sport","name":"S Sport","category":"Spor","website":""},{"id":"s-sport-2","name":"S Sport 2","category":"Spor","website":""},{"id":"sat7-turk","name":"Sat7 Türk","category":"Yerel","website":""},{"id":"semerkand-tv","name":"Semerkand TV","category":"Dini","website":""},{"id":"sercem-tv","name":"Sercem TV","category":"Dini","website":""},{"id":"show-turk","name":"Show Turk","category":"Ulusal","website":""},{"id":"star-tv","name":"Star TV","category":"Ulusal","website":"https://startv.com.tr"},{"id":"sun-rtv","name":"Sun RTV","category":"Yerel","website":""},{"id":"tbmm-tv","name":"TBMM TV","category":"Yerel","website":""},{"id":"tele-1","name":"Tele 1","category":"Yerel","website":""},{"id":"tempo-tv","name":"Tempo TV","category":"Yerel","website":""},{"id":"tgrt-belgesel-tv","name":"TGRT Belgesel TV","category":"Belgesel","website":""},{"id":"tgrt-haber","name":"TGRT Haber","category":"Haber","website":"https://tgrthaber.com.tr"},{"id":"tivi-6","name":"Tivi 6","category":"Yerel","website":""},{"id":"tjk-tv","name":"TJK TV","category":"Yerel","website":""},{"id":"tjk-tv-2","name":"TJK TV 2","category":"Yerel","website":""},{"id":"ton-tv","name":"Ton TV","category":"Yerel","website":""},{"id":"torba-tv","name":"Torba TV","category":"Yerel","website":""},{"id":"tr24-tv","name":"TR24 TV","category":"Yerel","website":""},{"id":"trt-1","name":"TRT 1","category":"Ulusal","website":"https://trt.net.tr"},{"id":"trt-2","name":"TRT 2","category":"Ulusal","website":"https://trt.net.tr"},{"id":"trt-3","name":"TRT 3","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-arabi","name":"TRT Arabi","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-avaz","name":"TRT Avaz","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-belgesel","name":"TRT Belgesel","category":"Belgesel","website":"https://trt.net.tr"},{"id":"trt-cocuk","name":"TRT Cocuk","category":"Çocuk","website":"https://trt.net.tr"},{"id":"trt-diyanet-cocuk","name":"TRT Diyanet Çocuk","category":"Çocuk","website":"https://trt.net.tr"},{"id":"trt-eba-ilkokul","name":"TRT EBA Ilkokul","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-eba-lise","name":"TRT EBA Lise","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-eba-ortaokul","name":"TRT EBA Ortaokul","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-haber","name":"TRT Haber","category":"Haber","website":"https://trt.net.tr"},{"id":"trt-kurd","name":"TRT Kurdî","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-kurdi","name":"TRT Kurdî","category":"Ulusal","website":"https://trt.net.tr"},{"id":"trt-muzik","name":"TRT Muzik","category":"Müzik","website":"https://trt.net.tr"},{"id":"trt-muzik","name":"TRT Müzik","category":"Müzik","website":"https://trt.net.tr"},{"id":"trt-spor","name":"TRT Spor","category":"Spor","website":"https://trt.net.tr"},{"id":"trt-spor-2","name":"TRT Spor 2","category":"Spor","website":"https://trt.net.tr"},{"id":"trt-turk","name":"TRT Türk","category":"Yerel","website":"https://trt.net.tr"},{"id":"trt-world","name":"TRT World","category":"Yerel","website":"https://trt.net.tr"},{"id":"tv-1","name":"TV 1","category":"Yerel","website":""},{"id":"tv-24","name":"TV 24","category":"Yerel","website":""},{"id":"tv-264","name":"TV 264","category":"Yerel","website":""},{"id":"tv-41","name":"TV 41","category":"Yerel","website":""},{"id":"tv-42","name":"TV 42","category":"Yerel","website":""},{"id":"tv-52","name":"TV 52","category":"Yerel","website":""},{"id":"tv-8","name":"TV 8","category":"Yerel","website":""},{"id":"tv4","name":"TV4","category":"Yerel","website":""},{"id":"tvnet","name":"TVNET","category":"Yerel","website":""},{"id":"turkhaber","name":"TürkHaber","category":"Haber","website":""},{"id":"urfa-natik-tv","name":"Urfa Natik TV","category":"Yerel","website":""},{"id":"van-65-tv","name":"Van 65 TV","category":"Yerel","website":""},{"id":"vav-tv","name":"Vav TV","category":"Yerel","website":""},{"id":"zarok-tv","name":"Zarok TV","category":"Çocuk","website":""},{"id":"ciftci-tv","name":"Çiftçi TV","category":"Yerel","website":""}],"streams":{"360-tv":["https://turkmedya-live.ercdn.net/tv360/tv360.m3u8"],"4u-tv":["https://hls.4utv.live/hls/stream.m3u8"],"a-haber":["https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/ahaber/ahaber.m3u8"],"a-spor":["https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/aspor/aspor.m3u8"],"a2tv":["https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/a2tv/a2tv.m3u8"],"afroturk-tv":["https://edge.socialsmart.tv/naturaltv/bant1/playlist.m3u8"],"aksu-tv":["https://live.artidijitalmedya.com/artidijital_aksutv/aksutv/playlist.m3u8"],"al-zahra-tv-turkic":["https://live.al-zahratv.com/live/playlist.m3u8"],"alanya-posta-tv":["https://api-tv3.yayin.com.tr/postatv/postatv/playlist.m3u8"],"almahriah-tv":["https://starmenajo.com/hls/almahriah/index.m3u8"],"altas-tv":["https://edge1.socialsmart.tv/altastv/bant1/playlist.m3u8"],"anadolu-net-tv":["https://live.artidijitalmedya.com/artidijital_anadolunet/anadolunet/playlist.m3u8"],"atv":["https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/atv/atv_1080p.m3u8"],"atv-alanya":["https://cdn-alanyatv.yayin.com.tr/alanyatv/alanyatv/playlist.m3u8"],"atv-avrupa":["https://flask-api-hls-atvavrupahdtrkvz-live.onrender.com/hls_stream/master.m3u8"],"benguturk-tv":["https://tv.ensonhaber.com/benguturk/benguturk.m3u8"],"beyaz-tv":["https://mn-nl.mncdn.com/blutv_beyaztv2/live.m3u8"],"bir-tv":["https://edge.taksimbilisim.com/birtv/bant1/playlist.m3u8"],"bloomberg-ht":["https://mumbai-edge.smartplaytv.in/BloombergHT/index.m3u8","https://tv.ensonhaber.com/bloomberght/bloomberght.m3u8"],"bloomberght":["https://ciner-live.daioncdn.net/bloomberght/bloomberght.m3u8"],"bursa-as-tv":["https://live.artidijitalmedya.com/artidijital_astv/astv/playlist.m3u8"],"bursa-tv":["https://win1.yayin.com.tr/bursatv/bursatv/playlist.m3u8"],"cay-tv":["https://edge1.socialsmart.tv/caytv/bant1/playlist.m3u8"],"cekmekoy-tv":["https://cdn-cekmekoybeltv.yayin.com.tr/cekmekoybeltv/cekmekoybeltv_1080p/playlist.m3u8"],"cnbc-e":["https://hnpsechtsc.turknet.ercdn.net/xpnvudnlsv/cnbc-e/cnbc-e.m3u8"],"deniz-postasi-tv":["https://live.artidijitalmedya.com/artidijital_denizpostasi/denizpostasi/playlist.m3u8"],"dha":["https://603c568fccdf5.streamlock.net/live/dhaweb1_C5efC/playlist.m3u8"],"diyanet-tv":["https://eustr73.mediatriple.net/videoonlylive/mtikoimxnztxlive/broadcast_5e3bf95a47e07.smil/playlist.m3u8"],"diyar-tv":["https://live.artidijitalmedya.com/artidijital_diyartv/diyartv/playlist.m3u8"],"dost-tv":["https://dost.stream.emsal.im/tv/live.m3u8"],"dream-turk":["https://live.duhnet.tv/S2/HLS_LIVE/dreamturknp/playlist.m3u8"],"edessa-tv":["https://canli.edessatv.com/hls/stream.m3u8"],"ekoturk":["https://cdn.ekoturk.net/hls/master.m3u8"],"erzurum-web-tv":["https://win29.yayin.com.tr/erzurumwebtv/erzurumwebtv/iptvdelisi.m3u8"],"es-tv":["https://live.artidijitalmedya.com/artidijital_estv/estv/playlist.m3u8"],"etv-kayseri":["https://live.artidijitalmedya.com/artidijital_etv/etv/playlist.m3u8"],"etv-manisa":["https://edge1.socialsmart.tv/manisaetv/bant1/playlist.m3u8"],"euro-d":["https://live.duhnet.tv/S2/HLS_LIVE/eurodnp/playlist.m3u8"],"finans-turk-tv":["https://yayin30.haber100.com/live/finansturk/playlist.m3u8"],"flash-haber-tv":["https://b01c02nl.mediatriple.net/videoonlylive/mtyycglqauzjhlive/broadcast_67c053c48829f.smil/playlist.m3u8"],"fortuna-tv":["https://edge.taksimbilisim.com/ftvturk/bant1/playlist.m3u8","https://edge1.socialsmart.tv/ftvturk/bant1/playlist.m3u8"],"guneydogu-tv":["https://edge1.socialsmart.tv/gtv/bant1/playlist.m3u8"],"gzt":["https://gzttv-live.lg.mncdn.com/gzttv/gzttv/playlist.m3u8"],"haber-global":["https://tv.ensonhaber.com/haberglobal/haberglobal.m3u8"],"haber61-tv":["https://cdn-haber61tv.yayin.com.tr/haber61tv/smil:haber61tv.smil/index.m3u8","https://win8.yayin.com.tr/haber61tv/smil:haber61tv.smil/playlist.m3u8"],"haberturk-tv":["https://tv.ensonhaber.com/haberturk/haberturk.m3u8"],"halk-tv":["https://halktv-live.daioncdn.net/halktv/halktv.m3u8"],"htspor-tv":["https://ciner.daioncdn.net/ht-spor/ht-spor.m3u8?app=web"],"hunat-tv":["https://59cba4d34b678.streamlock.net/canlitv/hunattv/playlist.m3u8"],"icel-tv":["https://edge1.socialsmart.tv/iceltv/bant1/playlist.m3u8"],"ilke-tv":["https://stream.ilketv.com.tr/hls/ilkecanli.m3u8"],"kanal-12":["https://live.artidijitalmedya.com/artidijital_kanal12/kanal12/playlist.m3u8"],"kanal-15":["https://live.artidijitalmedya.com/artidijital_kanal15/kanal15/playlist.m3u8"],"kanal-23":["https://cdn-kanal23.yayin.com.tr/kanal23/index.m3u8","https://live.artidijitalmedya.com/artidijital_kanal23/kanal23/playlist.m3u8"],"kanal-26":["https://live.artidijitalmedya.com/artidijital_kanal26/kanal26/playlist.m3u8"],"kanal-3":["https://live.artidijitalmedya.com/artidijital_kanal3/kanal3/playlist.m3u8","https://waw2.artiyerelmedya.net/kanal3/bant1/playlist.m3u8","https://live.artidijitalmedya.com/artidijital_kanal3/kanal3guncel/playlist.m3u8"],"kanal-32":["https://edge1.socialsmart.tv/kanal32/bant1/playlist.m3u8"],"kanal-33":["https://edge1.socialsmart.tv/kanal33/bant1/playlist.m3u8"],"kanal-34":["https://vdo.digitalbox.xyz:3266/live/kanal34tvlive.m3u8"],"kanal-58":["https://live.artidijitalmedya.com/artidijital_kanal58/kanal58/playlist.m3u8"],"kanal-7":["https://kanal7.blutv.com/blutv_kanal7_live/live.m3u8","https://kanal7-live.daioncdn.net/kanal7/kanal7.m3u8"],"kanal-7-avrupa":["https://livetv.radyotvonline.net/kanal7live/kanal7avr/playlist.m3u8"],"kanal-d":["https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3"],"kanal-d-drama":["https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01602-themahqfrance-vivekanald-samsungspain/playlist.m3u8"],"kanal-firat":["https://live.artidijitalmedya.com/artidijital_kanalfirat/kanalfirat/playlist.m3u8"],"kanal-hayat":["https://tbn02a.ltnschedule.com/hls/nx21i.m3u8"],"kanal-v":["https://live.artidijitalmedya.com/artidijital_kanalv/kanalv/playlist.m3u8"],"kent-turk-tv":["https://live.artidijitalmedya.com/artidijital_kentturktv/kentturktv/playlist.m3u8","https://live.artidijitalmedya.com/artidijital_38kenttv/38kenttv/playlist.m3u8"],"kocaeli-tv":["https://edge.taksimbilisim.com/kocaelitv/bant1/playlist.m3u8"],"konya-olay-tv":["https://live.artidijitalmedya.com/artidijital_konyaolaytv/konyaolaytv/playlist.m3u8"],"kral-pop-tv":["https://dogus-live.daioncdn.net/kralpoptv/playlist.m3u8"],"lalegul-tv":["https://lbl.netmedya.net/hls/lalegultv.m3u8"],"life-tv":["https://live.artidijitalmedya.com/artidijital_lifetv/lifetv/playlist.m3u8"],"line-tv":["https://edge1.socialsmart.tv/linetv/bant1/playlist.m3u8"],"luys-tv":["https://b01c02nl.mediatriple.net/videoonlylive/mtpayqrfkgirxelive/broadcast_5e91c5ac96898.smil/playlist.m3u8"],"mavikaradeniz":["https://live.artidijitalmedya.com/artidijital_mavikaradeniz/mavikaradeniz/playlist.m3u8"],"mekameleen-tv":["https://mn-nl.mncdn.com/mekameleen/smil:mekameleentv.smil/playlist.m3u8"],"meltem-tv":["https://vhxyrsly.rocketcdn.com/meltemtv/playlist.m3u8"],"mercan-tv":["https://live.artidijitalmedya.com/artidijital_mercantv/mercantv/playlist.m3u8"],"minika-cocuk":["https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/minikago_cocuk/minikago_cocuk.m3u8"],"minika-go":["https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/minikago/minikago.m3u8"],"mturk-tv":["https://edge1.socialsmart.tv/muglaturk/bant1/playlist.m3u8"],"natural-tv":["https://edge1.socialsmart.tv/naturaltv/bant1/playlist.m3u8"],"now-tv":["https://uycyyuuzyh.turknet.ercdn.net/nphindgytw/nowtv/nowtv.m3u8"],"ntv":["https://dogus.daioncdn.net/ntv/ntv.m3u8?app=ntv_web"],"number-1-ask":["https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/u_stream_5c9e18f9cea15_1/playlist.m3u8"],"number-1-damar":["https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/u_stream_5c9e198784bdc_1/playlist.m3u8"],"number-1-dance":["https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/u_stream_5c9e2aa8acf44_1/playlist.m3u8"],"number-1-tv":["https://b01c02nl.mediatriple.net/videoonlylive/mtkgeuihrlfwlive/broadcast_5c9e17cd59e8b.smil/playlist.m3u8","https://mn-nl.mncdn.com/blutv_nr12/live.m3u8"],"on4-tv":["https://edge1.socialsmart.tv/on4/bant1/playlist.m3u8"],"power-dance":["https://livetv.powerapp.com.tr/dance/dance.smil/playlist.m3u8"],"power-love":["https://livetv.powerapp.com.tr/plove/love.smil/playlist.m3u8"],"power-turk":["https://livetv.powerapp.com.tr/powerturkTV/powerturkhd.smil/playlist.m3u8"],"power-tv":["https://livetv.powerapp.com.tr/powerTV/powerhd.smil/playlist.m3u8","https://live.artidijitalmedya.com/artidijital_powertv/powertv/playlist.m3u8"],"power-turk-akustik":["https://livetv.powerapp.com.tr/pturkakustik/akustik.smil/playlist.m3u8"],"power-turk-slow":["https://livetv.powerapp.com.tr/pturkslow/slow.smil/playlist.m3u8"],"power-turk-taptaze":["https://livetv.powerapp.com.tr/pturktaptaze/taptaze.smil/playlist.m3u8"],"powerturk-tv":["https://live.artidijitalmedya.com/artidijital_powerturktv/powerturktv/playlist.m3u8"],"qaf-tv":["https://customer-9vqui33qma2rownb.cloudflarestream.com/7792e558fe54e23bdd4b462ec275cdba/manifest/video.m3u8"],"s-sport":["https://corestream.siteyaptim.live/s-sport/index.m3u8"],"s-sport-2":["https://corestream.siteyaptim.live/s-sport2/index.m3u8","https://bcovlive-a.akamaihd.net/29c60f23ea4840ba8726925a77fcfd0b/eu-central-1/6415845530001/profile_0/chunklist.m3u8"],"sat7-turk":["https://live.artidijitalmedya.com/artidijital_sat7turk/sat7turk/playlist.m3u8","https://svs.itworkscdn.net/sat7turklive/sat7turk.smil/playlist.m3u8"],"semerkand-tv":["https://b01c02nl.mediatriple.net/videoonlylive/mtisvwurbfcyslive/broadcast_58d915bd40efc.smil/playlist.m3u8"],"sercem-tv":["https://canli.sercemtv.com.tr/hls/0/stream.m3u8"],"show-turk":["https://raw.githubusercontent.com/bnyusuf67-crypto/streams/refs/heads/main/streams/shturk.m3u8"],"star-tv":["https://dogus.daioncdn.net/startv/startv_720p.m3u8?app=a20ac41e-bdc3-4aa1-934d-26b484480ac9&ce=3&sid=8l4w3lst4co5"],"sun-rtv":["https://live.artidijitalmedya.com/artidijital_sunrtv/sunrtv/playlist.m3u8","https://tr.socialsmart.tv/suntv/bant1/chunks.m3u8"],"tbmm-tv":["https://meclistv-live.ercdn.net/meclistv/meclistv.m3u8"],"tele-1":["https://tele1-live.ercdn.net/tele1/tele1.m3u8"],"tempo-tv":["https://live.artidijitalmedya.com/artidijital_tempotv/tempotv/playlist.m3u8"],"tgrt-belgesel-tv":["https://b01c02nl.mediatriple.net/videoonlylive/mtsxxkzwwuqtglive/broadcast_5fe462afc6a0e.smil/playlist.m3u8"],"tgrt-haber":["https://canli.tgrthaber.com/tgrt.m3u8","https://b01c02nl.mediatriple.net/videoonlylive/mtsxxkzwwuqtglive/broadcast_5fe4598be8e5d.smil/playlist.m3u8"],"tivi-6":["https://live.artidijitalmedya.com/artidijital_tivi6/tivi6/playlist.m3u8"],"tjk-tv":["https://tjktv-live.tjk.org/tjktv.m3u8"],"tjk-tv-2":["https://tjktv-live.tjk.org/tjktv2/tjktv2.m3u8"],"ton-tv":["https://live.artidijitalmedya.com/artidijital_tontv/tontv/playlist.m3u8"],"torba-tv":["https://59cba4d34b678.streamlock.net/canlitv/torbatv/playlist.m3u8"],"tr24-tv":["https://tv.ensonhaber.com/tv24/tv24.m3u8"],"trt-1":["https://tv-trt1.medya.trt.com.tr/master.m3u8"],"trt-3":["https://tv-trt3.live.trt.com.tr/master.m3u8"],"trt-arabi":["https://tv-trtarabi.medya.trt.com.tr/master.m3u8"],"trt-avaz":["https://tv-trtavaz.medya.trt.com.tr/master.m3u8"],"trt-belgesel":["https://tv-trtbelgesel-dai.medya.trt.com.tr/master.m3u8","https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8"],"trt-cocuk":["https://tv-trtcocuk.medya.trt.com.tr/master.m3u8"],"trt-diyanet-cocuk":["https://tv-trtdiyanetcocuk.medya.trt.com.tr/master.m3u8"],"trt-eba-ilkokul":["https://tv-e-okul00.medya.trt.com.tr/master.m3u8"],"trt-eba-lise":["https://tv-e-okul02.medya.trt.com.tr/master.m3u8"],"trt-eba-ortaokul":["https://tv-e-okul01.medya.trt.com.tr/master.m3u8"],"trt-haber":["https://tv-trthaber.medya.trt.com.tr/master.m3u8"],"trt-kurd":["https://tv-trtkurdi.medya.trt.com.tr/master.m3u8"],"trt-muzik":["https://tv-trtmuzik.medya.trt.com.tr/master.m3u8"],"trt-spor":["https://tv-trtspor1.medya.trt.com.tr/master.m3u8","https://corestream.siteyaptim.live/trt-spor/index.m3u8"],"trt-turk":["https://tv-trtturk.medya.trt.com.tr/master.m3u8"],"trt-world":["https://tv-trtworld.medya.trt.com.tr/master.m3u8","https://mumbai-edge.smartplaytv.in/TRTWorld/index.m3u8","https://cdn.pishow.tv/ott/live/266/master.m3u8"],"tv-1":["https://edge1.socialsmart.tv/tv1/bant1/playlist.m3u8"],"tv-24":["https://turkmedya-live.ercdn.net/tv24/tv24.m3u8"],"tv-264":["https://b01c02nl.mediatriple.net/videoonlylive/mtdxkkitgbrckilive/broadcast_5ee244263fd6d.smil/playlist.m3u8"],"tv-41":["https://live.artidijitalmedya.com/artidijital_tv41/tv41/playlist.m3u8"],"tv-42":["https://canli.tv42.com.tr/memfs/d936e417-c4bd-4d42-89a2-02f289892d1d.m3u8"],"tv-52":["https://edge1.socialsmart.tv/tv52/bant1/playlist.m3u8"],"tv-8":["https://tv8.daioncdn.net/tv8/tv8.m3u8?app=7ddc255a-ef47-4e81-ab14-c0e5f2949788&ce=3","https://tv8-live.daioncdn.net/tv8/tv8.m3u8"],"tv4":["https://turkmedya-live.ercdn.net/tv4/tv4.m3u8"],"tvnet":["https://tvnet-live.lg.mncdn.com/tvnet/tvnet/playlist.m3u8"],"turkhaber":["https://edge1.socialsmart.tv/turkhaber/bant1/playlist.m3u8"],"urfa-natik-tv":["https://live.artidijitalmedya.com/artidijital_urfanatiktv/urfanatiktv/playlist.m3u8"],"van-65-tv":["https://live.artidijitalmedya.com/artidijital_van65/van65/playlist.m3u8"],"vav-tv":["https://playlist.fasttvcdn.com/pl/rfrk9821hdy9dayo8wfyha/kltr-sanat-tv/playlist.m3u8"],"zarok-tv":["https://zindikurmanci.zaroktv.com.tr/hls/stream.m3u8"],"ciftci-tv":["https://live.artidijitalmedya.com/artidijital_ciftcitv/ciftcitv/playlist.m3u8"],"trt-2":["https://tv-trt2.medya.trt.com.tr/master.m3u8"],"trt-spor-2":["https://tv-trtspor2.medya.trt.com.tr/master.m3u8"],"trt-kurdi":["https://tv-trtkurdi.medya.trt.com.tr/master.m3u8"]}};
+const BASE = "https://karakaya1745.github.io";
+const $ = s => document.querySelector(s);
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+let channels = [], streams = {}, cat = "Tümü", query = "", current = null, hls = null;
+
+/* ---- Katalog normalizasyonu: farklı JSON biçimlerini kabul eder ---- */
+function normChannels(raw){
+  let arr = Array.isArray(raw) ? raw : (raw && (raw.channels || raw.items || Object.values(raw))) || [];
+  return arr.filter(c => c && typeof c === "object").map((c,i) => ({
+    id: String(c.id ?? c.slug ?? c.key ?? c.name ?? i),
+    name: c.name ?? c.title ?? c.ad ?? ("Kanal " + (i+1)),
+    category: c.category ?? c.kategori ?? c.group ?? "Diğer",
+    site: c.website ?? c.site ?? c.url ?? c.web ?? "",
+    url: c.stream ?? c.m3u8 ?? ""
+  }));
+}
+function normStreams(raw){
+  const m = {};
+  if (Array.isArray(raw)) raw.forEach(e => { if (e && (e.id||e.name)) m[String(e.id ?? e.name)] = e.url ?? e.stream ?? e.m3u8; });
+  else if (raw && typeof raw === "object") Object.entries(raw).forEach(([k,v]) => m[k] = (v && typeof v === "object") ? (v.url ?? v.stream ?? v.m3u8 ?? (Array.isArray(v)?v[0]:undefined)) : v);
+  return m;
+}
+function candidates(c){
+  let s = streams[c.id] ?? streams[c.name] ?? c.url;
+  const out = [];
+  const add = x => { if (typeof x === "string" && /^https?:/i.test(x.trim())) out.push(x.trim()); else if (Array.isArray(x)) x.forEach(add); else if (x && typeof x === "object") add(x.url ?? x.stream ?? x.m3u8 ?? x.src); };
+  add(s);
+  return [...new Set(out)];
+}
+function streamFor(c){ return candidates(c)[0] || null; }
+function key(n){
+  let k = String(n).toLowerCase().replace(/[ıİ]/g,"i").replace(/ö/g,"o").replace(/ü/g,"u").replace(/ç/g,"c").replace(/ş/g,"s").replace(/ğ/g,"g").replace(/î/g,"i").replace(/[^a-z0-9]/g,"");
+  const t = k.replace(/tv$/,"");
+  return t.length >= 2 ? t : k;
+}
+function mergeBundled(){
+  const bs = normStreams(BUNDLED.streams), map = new Map();
+  BUNDLED.channels.forEach(b => map.set(key(b.name), b));
+  const used = new Set();
+  channels.forEach(c => {
+    const b = map.get(key(c.name));
+    if (!b) return;
+    used.add(b.id);
+    const mine = candidates(c), extra = bs[b.id] || [];
+    if (!mine.length && extra.length) streams[c.id] = extra;
+    else if (mine.length) streams[c.id] = [...mine, ...extra.filter(u => !mine.includes(u))];
+    if (!c.site && b.website) c.site = b.website;
+  });
+  BUNDLED.channels.forEach(b => {
+    if (used.has(b.id) || channels.some(c => key(c.name) === key(b.name))) return;
+    const id = "b-" + b.id; streams[id] = bs[b.id];
+    channels.push({id, name: b.name, category: b.category, site: b.website || "", url: ""});
+  });
+  channels.sort((a,b) => (!!streamFor(b)) - (!!streamFor(a)) || a.name.localeCompare(b.name, "tr"));
+}
+function apply(ch, sm){
+  channels = normChannels(ch); streams = normStreams(sm);
+  mergeBundled();
+  render();
+  const n = channels.filter(streamFor).length;
+  $("#status").textContent = channels.length + " kanal · " + n + " yayın";
+}
+
+/* ---- Yükleme: yerel önbellek → uzak katalog ---- */
+async function getJSON(name){
+  const r = await fetch(BASE + "/" + name, {cache:"no-cache"});
+  if (!r.ok) throw new Error(name + " " + r.status);
+  return r.json();
+}
+async function updateCatalog(manual){
+  $("#status").textContent = "Katalog denetleniyor…";
+  try{
+    const meta = await getJSON("metadata.json");
+    const have = store.get("meta");
+    const ver = JSON.stringify(meta);
+    if (have === ver && store.get("channels") && !manual){ return apply(store.get("channels"), store.get("streams")); }
+    const [ch, sm] = await Promise.all([getJSON("channels.json"), getJSON("stream_map.json")]);
+    store.set("meta", ver); store.set("channels", ch); store.set("streams", sm);
+    apply(ch, sm);
+    $("#status").textContent += " · güncel";
+  }catch(e){
+    const c = store.get("channels");
+    if (c) { apply(c, store.get("streams")); $("#status").textContent += " · çevrimdışı"; }
+    else { apply(BUNDLED.channels, BUNDLED.streams); $("#status").textContent += " · yerleşik liste"; }
+  }
+}
+$("#upd").onclick = () => updateCatalog(true);
+$("#imp").onclick = () => $("#file").click();
+$("#file").onchange = async e => {
+  let ch = store.get("channels"), sm = store.get("streams");
+  for (const f of e.target.files){
+    try{
+      const j = JSON.parse(await f.text());
+      if (/stream/i.test(f.name)) sm = j; else if (/channel/i.test(f.name)) ch = j;
+    }catch(err){ $("#status").textContent = f.name + " okunamadı"; return; }
+  }
+  if (ch){ store.set("channels", ch); if (sm) store.set("streams", sm); apply(ch, sm || {}); }
+};
+
+/* ---- Liste ---- */
+function renderCats(){
+  const cats = ["Tümü", ...new Set(channels.map(c => c.category))];
+  $("#cats").innerHTML = "";
+  cats.forEach(c => {
+    const b = document.createElement("button");
+    b.textContent = c; if (c === cat) b.className = "on";
+    b.onclick = () => { cat = c; render(); };
+    $("#cats").appendChild(b);
+  });
+}
+function visible(){
+  const q = query.toLocaleLowerCase("tr");
+  const ok = store.get("ok"), only = $("#only").checked && ok;
+  return channels.filter(c => (cat === "Tümü" || c.category === cat) && c.name.toLocaleLowerCase("tr").includes(q) && (!only || ok[c.id] === true));
+}
+function icon(c){
+  const d = document.createElement("div"); d.className = "ico";
+  const ini = c.name.trim().slice(0,2).toLocaleUpperCase("tr");
+  let host = ""; try{ host = new URL(c.site).hostname; }catch(e){}
+  if (host){
+    const im = new Image(); im.alt = ""; im.loading = "lazy";
+    im.src = "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(host) + "&sz=64";
+    im.onerror = () => { d.textContent = ini; };
+    d.appendChild(im);
+  } else d.textContent = ini;
+  return d;
+}
+function render(){
+  renderCats();
+  const list = $("#list"); list.innerHTML = "";
+  const items = visible();
+  if (!items.length){ list.innerHTML = '<p style="padding:16px;color:var(--mute)">Kanal bulunamadı. Aramayı veya kategoriyi değiştirin.</p>'; return; }
+  items.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "ch" + (current && current.id === c.id ? " on" : "") + (streamFor(c) ? "" : " nostream");
+    b.setAttribute("role","option"); b.dataset.id = c.id;
+    b.appendChild(icon(c));
+    const t = document.createElement("div"); t.className = "txt";
+    t.innerHTML = '<div class="nm"></div><small></small>';
+    t.firstChild.textContent = c.name; t.lastChild.textContent = c.category;
+    b.appendChild(t);
+    b.onclick = () => play(c);
+    list.appendChild(b);
+  });
+}
+$("#q").oninput = e => { query = e.target.value; render(); };
+
+/* ---- Oynatma ---- */
+function showMsg(title, text){ const m = $("#msg"); m.className = ""; m.innerHTML = "<div><b></b><span></span></div>"; m.querySelector("b").textContent = title; m.querySelector("span").textContent = text; }
+function play(c){
+  current = c; store.set("last", c.id);
+  $("#title").textContent = c.name; $("#ctitle").textContent = c.category; $("#liveTag").hidden = false;
+  document.querySelectorAll(".ch").forEach(el => el.classList.toggle("on", el.dataset.id === c.id));
+  const v = $("#v"), list = candidates(c);
+  if (hls){ hls.destroy(); hls = null; }
+  v.removeAttribute("src"); v.load();
+  if (!list.length){ showMsg("Bu kanal için yayın adresi yok", "stream_map.json içinde “" + c.name + "” için http(s) adresi bulunamadı."); return; }
+  let idx = 0, token = Symbol(); play.t = token;
+  const ok = () => { if (play.t === token) $("#msg").classList.add("hide"); };
+  v.onplaying = ok; v.oncanplay = ok; v.onloadeddata = ok;
+  const next = why => {
+    if (play.t !== token) return;
+    if (hls){ hls.destroy(); hls = null; }
+    idx++;
+    if (idx < list.length) return start();
+    const url = list[0];
+    showMsg("Yayın açılamadı", why + " — " + (location.protocol === "file:" ? "Dosya doğrudan açıldığı için sunucu CORS iznini reddediyor olabilir. " : "") + "Adres: " + url);
+  };
+  const start = () => {
+    const url = list[idx];
+    showMsg("Bağlanıyor…", c.name + (list.length > 1 ? " (" + (idx+1) + "/" + list.length + ")" : ""));
+    if (location.protocol === "https:" && url.startsWith("http:")) return next("Güvenli sayfadan http yayın açılamaz (karışık içerik)");
+    const playIt = () => v.play().catch(e => { if (e.name === "NotAllowedError"){ v.muted = true; v.play().catch(()=>{}); } });
+    const apple = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.vendor || "").includes("Apple");
+    const native = v.canPlayType("application/vnd.apple.mpegurl");
+    if (apple && native){
+      v.onerror = () => next("Oynatıcı yayını açamadı");
+      v.src = url; playIt();
+    } else if (window.Hls && Hls.isSupported()){
+      hls = new Hls({lowLatencyMode:false, manifestLoadingMaxRetry:1, levelLoadingMaxRetry:1, fragLoadingMaxRetry:2});
+      hls.on(Hls.Events.MANIFEST_PARSED, playIt);
+      hls.on(Hls.Events.ERROR, (_,d) => {
+        if (!d.fatal) return;
+        if (d.type === Hls.ErrorTypes.MEDIA_ERROR && !start.rec){ start.rec = 1; hls.recoverMediaError(); return; }
+        const code = d.response && d.response.code;
+        next("Hata: " + d.details + (code ? " (HTTP " + code + ")" : (d.type === Hls.ErrorTypes.NETWORK_ERROR ? " (ağ/CORS engeli)" : "")));
+      });
+      start.rec = 0;
+      hls.loadSource(url); hls.attachMedia(v);
+    } else if (v.canPlayType("application/vnd.apple.mpegurl")){
+      v.src = url; v.onerror = () => next("Oynatıcı yayını açamadı"); playIt();
+    } else showMsg("Tarayıcı HLS desteklemiyor", "Edge, Chrome veya Safari kullanın.");
+  };
+  start();
+}
+function step(d){
+  const items = visible().filter(streamFor); if (!items.length) return;
+  let i = items.findIndex(c => current && c.id === current.id);
+  play(items[(i + d + items.length) % items.length]);
+  document.querySelector(".ch.on")?.scrollIntoView({block:"nearest"});
+}
+
+/* ---- Klavye ve tam ekran ---- */
+function fullscreen(){
+  const sc = $(".screen"), v = $("#v");
+  if (sc.requestFullscreen){ document.fullscreenElement ? document.exitFullscreen() : sc.requestFullscreen(); }
+  else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+}
+$("#fs").onclick = fullscreen;
+addEventListener("keydown", e => {
+  if (e.target.id === "q") return;
+  if (e.key === "ArrowDown"){ e.preventDefault(); step(1); }
+  else if (e.key === "ArrowUp"){ e.preventDefault(); step(-1); }
+  else if (e.key.toLowerCase() === "f") fullscreen();
+  else if (e.key.toLowerCase() === "m") $("#v").muted = !$("#v").muted;
+});
+
+/* ---- Yayın sınaması: her kanalı gerçekten açmayı dener ---- */
+const APPLE = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.vendor || "").includes("Apple");
+function prefer(id, u){ const cs = candidates({id, name:id, url:""}); streams[id] = [u, ...cs.filter(x => x !== u)]; }
+function probe(url, ms = 10000){
+  return new Promise(res => {
+    const v = document.createElement("video"); v.muted = true; let h, done = false, t;
+    const fin = r => { if (done) return; done = true; clearTimeout(t); try{ h && h.destroy(); }catch(e){} v.removeAttribute("src"); try{ v.load(); }catch(e){} res(r); };
+    t = setTimeout(() => fin(false), ms);
+    if (APPLE && v.canPlayType("application/vnd.apple.mpegurl")){ v.onloadeddata = () => fin(true); v.onerror = () => fin(false); v.src = url; }
+    else if (window.Hls && Hls.isSupported()){
+      h = new Hls({manifestLoadingMaxRetry:0, levelLoadingMaxRetry:0, fragLoadingMaxRetry:0});
+      h.on(Hls.Events.FRAG_LOADED, () => fin(true));
+      h.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) fin(false); });
+      h.loadSource(url); h.attachMedia(v);
+    } else fin(false);
+  });
+}
+async function runTest(){
+  if (runTest.busy) return; runTest.busy = true;
+  const list = channels.filter(streamFor), ok = {}, good = {};
+  let i = 0, done = 0, n = 0;
+  const worker = async () => {
+    while (i < list.length){
+      const c = list[i++];
+      for (const u of candidates(c)){
+        if (location.protocol === "https:" && u.startsWith("http:")) continue;
+        if (await probe(u)){ ok[c.id] = true; good[c.id] = u; prefer(c.id, u); n++; break; }
+      }
+      if (!ok[c.id]) ok[c.id] = false;
+      done++;
+      $("#status").textContent = "Sınanıyor " + done + "/" + list.length + " · " + n + " çalışıyor";
+      if (done % 8 === 0){ store.set("ok", ok); render(); }
+    }
+  };
+  await Promise.all(Array.from({length:6}, worker));
+  store.set("ok", ok); store.set("good", good);
+  runTest.busy = false; render();
+  $("#status").textContent = n + " çalışan kanal / " + list.length + " denendi";
+  if (!n) showMsg("Hiçbir yayın açılmadı", "İnternet bağlantınızı ve Windows sürümünü (CORS kısıtı olmayan) kullandığınızı kontrol edin.");
+}
+$("#tst").onclick = () => { store.set("ok", null); runTest(); };
+$("#only").onchange = () => render();
+
+/* ---- Başlat ---- */
+(function init(){
+  if (store.get("schema") !== "v3"){ ["channels","streams","meta","ok","good","last"].forEach(k => { try{ localStorage.removeItem(k); }catch(e){} }); store.set("schema","v3"); }
+  apply(BUNDLED.channels, BUNDLED.streams);
+  const g = store.get("good"); if (g) Object.entries(g).forEach(([id,u]) => prefer(id, u));
+  render();
+  const lc = channels.find(x => x.id === store.get("last"));
+  if (lc){ current = lc; $("#title").textContent = lc.name; $("#ctitle").textContent = lc.category; showMsg("Son izlediğiniz: " + lc.name, "Başlatmak için kanala tıklayın."); }
+  const ok = store.get("ok");
+  if (ok) $("#status").textContent = Object.values(ok).filter(Boolean).length + " çalışan kanal";
+  else runTest();
+})();
+</script>
+</body>
+</html>
